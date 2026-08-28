@@ -47,7 +47,7 @@ app.post("/api/v1/chat", inconnuRequireApiKey, async (req, res) => {
       { role: "user", content: message },
     ],
     (settings?.temperature ?? 70) / 100,
-    () => {} // non-streaming for the public API
+    () => {} 
   );
 
   res.json({ reply });
