@@ -1,0 +1,81 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: inconnu_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-inconnu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-inconnu_dark_ia}
+    volumes:
+      - inconnu_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-inconnu}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: inconnu_ollama
+    restart: unless-stopped
+    volumes:
+      - inconnu_ollama:/root/.ollama
+    # GPU passthrough (uncomment if the VPS has an NVIDIA GPU + nvidia-container-toolkit):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  ollama-init:
+    image: ollama/ollama:latest
+    depends_on:
+      - ollama
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        until curl -sf http://ollama:11434 >/dev/null; do echo "[inconnu] waiting for ollama..."; sleep 2; done
+        ollama pull ${OLLAMA_MODEL:-qwen2.5} --host http://ollama:11434 || true
+        echo "[inconnu] model ready."
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+
+  server:
+    build:
+      context: .
+      dockerfile: docker/server.Dockerfile
+    container_name: inconnu_server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-inconnu}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-inconnu_dark_ia}
+      OLLAMA_URL: http://ollama:11434
+      JWT_SECRET: ${JWT_SECRET}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      PORT: 4000
+    ports:
+      - "4000:4000"
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    container_name: inconnu_web
+    restart: unless-stopped
+    depends_on:
+      - server
+    environment:
+      SERVER_URL: http://server:4000
+    ports:
+      - "3000:3000"
+
+volumes:
+  inconnu_pgdata:
+  inconnu_ollama:
