@@ -5,7 +5,6 @@ export interface OllamaChatMessage {
   content: string;
 }
 
-// Streams tokens from Ollama's /api/chat endpoint and calls onToken for each chunk.
 export async function inconnuOllamaChat(
   model: string,
   messages: OllamaChatMessage[],
