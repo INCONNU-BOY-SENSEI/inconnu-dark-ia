@@ -8,5 +8,6 @@ RUN npm install --workspace=apps/web
 COPY apps/web ./apps/web
 RUN npm run build --workspace=apps/web
 
+
 EXPOSE 3000
 CMD ["npm", "run", "start", "--workspace=apps/web"]
